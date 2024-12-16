@@ -1,0 +1,1 @@
+geth attach --datadir data ipc:\\.\pipe\geth.ipc

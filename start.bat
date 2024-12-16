@@ -1,0 +1,1 @@
+geth --datadir data --networkid 123456 --unlock 0xbD99a7d816C14E8B4BC6cd86616dE62Db4710134 --allow-insecure-unlock --http --http.corsdomain="*" --http.api web3,eth,debug,personal,net,miner --miner.etherbase 0x94196c91b9fce6162443b14f3aa9d48e87853306 --rpc.enabledeprecatedpersonal console
