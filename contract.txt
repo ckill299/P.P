@@ -1,313 +1,115 @@
-//SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL-3.0
 
-pragma solidity >=0.8.0;
-
-contract EstateAgency {
+pragma solidity >=0.7.0 <0.9.0;
 
 
 
+contract PP {
 
-    struct Estate {
-        address owner;
-        string info;
-        uint square;
-        bool presentSTAT;
-        bool saleSTAT;
-        bool arestSTAT;
+    modifier isExitItem(uint256 iID) {
+        require(iID < items.length, "600");
+        _;
+    }
+
+    modifier isAdmin() {
+        require(msg.sender == Admin, "100");
+        _;
+    }
+
+    modifier isOwner(uint256 iID) {
+        require(msg.sender == items[iID].owner, "101");
+        _;
+    }
+
+    modifier isOkayItem (uint iID) {
+        require(false == items[iID].SaleStat, "200");
+        require(false == items[iID].Arest, "201");
+        _;
     }
 
 
-    struct Present {
-        uint estateID;
-        address adrFrom;
-        address adrTo;
-        uint deadline;
-        presentSTAT status;
+    struct Item{
+        uint256 iID;
+        string name;
+        address owner; 
+        address supplier;
+        uint256 price;
+        string date; // 12.02.2023
+        string number;
+        STAT status;
+        bool SaleStat;
+        bool Arest;
     }
 
-
-    struct Sale{
-        uint estateID;
+    struct Sale {
+        uint256 sID;
+        uint256 iID;
         address owner;
         address newOwner;
         uint price;
-        address[] customers;
-        uint[] bids;
+        bool active;
+        uint256 exhibitionTime;
+        uint256 endExhibition;
     }
-    
 
-    enum presentSTAT {
-        ACTIVE,
-        REFUSE,
-        ACCEPT,
-        CANCEL,
-        RECONSIDER
+    enum STAT{
+        flies,
+        walks,
+        looks,
+        floats
     }
-    
 
-    Estate[] public estates;
-    Present[] public presents;
+    address public Admin;
+
+    Item[] public items;
     Sale[] public sales;
 
 
-    address public admin;
-
-
-    uint public presentTime = 60;
-
-
-    modifier isAdmin() {
-        require(msg.sender == admin, "You are not admin");
-        _;
+    constructor() {
+        Admin = msg.sender;
+        items.push(Item(0, "Shark", Admin, Admin, 10, "10.01.2025", "0W01", STAT.floats, false, false));
+        items.push(Item(1, "Parrot", Admin, Admin, 1, "15.10.2025", "0F02", STAT.flies, false, false));
+        items.push(Item(2, "Rhinoceros", Admin, Admin, 15, "15.01.2024", "0E03", STAT.walks, false, false));
     }
 
-    modifier onlyOwner(uint estateID) {
-        require(estates[estateID].owner == msg.sender, "It's not your estate!");
-        _;
-    }
+    function CreateItem(string memory _name,address _owner,address _supplier,uint256 _price,string memory _date,string memory _number,STAT _status) public isAdmin() {
+        items.push(Item(items.length, _name, _owner, _supplier, _price, _date, _number, _status, false, false));
+    } 
 
-
-    modifier statusOK(uint estateID) {
-        require(estates[estateID].presentSTAT == false, "Already in present");
-        require(estates[estateID].saleSTAT == false, "Already in sale");
-        require(estates[estateID].arestSTAT == false, "Estate in arest");
-        _;
-    }
-
-    constructor(address _adminAdr) {
-        admin = _adminAdr;
-    }
-
-
-
-    function createEstate(address _owner, string memory _info, uint _square) public isAdmin {
-        require(_owner != address(0), "Wrong address!");
-        require(_square > 0, "Wrong quiare value");
-        estates.push(Estate(_owner, _info, _square, false, false, false));
-    }
-
-
-
-    function changeArestSTAT(uint estateID, bool _newArestSTAT) public isAdmin {
-        require(_newArestSTAT != estates[estateID].arestSTAT, "The same arestSTAT");
-        estates[estateID].arestSTAT = _newArestSTAT;
-    }
-
-
-
-    function createPresent(uint estateID, address _adrTo) public statusOK(estateID) onlyOwner(estateID) {
-        require(_adrTo != address(0), "Wrong address");
-        require(estateID < estates.length, "Wrong estateID value");
-        require(_adrTo != msg.sender, "Selfpresenting!");
-        presents.push(Present(estateID, msg.sender, _adrTo, presentTime + block.timestamp, presentSTAT.ACTIVE));
-        estates[estateID].presentSTAT = true;
-    }
-
-
-    function reconsiderPresent(uint presentID) public {
-        require(presentID < presents.length, "Wrong estateID!");
-        require(presents[presentID].status == presentSTAT.ACTIVE, "Already finished");
-        require(presents[presentID].adrFrom == msg.sender, "You are not owner!");
-        uint estateID = presents[presentID].estateID;
-        if (presents[presentID].deadline > block.timestamp) {
-            presents[presentID].status = presentSTAT.RECONSIDER;
+    function ArestStat(uint256 _iID) public  isAdmin() isExitItem(_iID){
+        if (items[_iID].Arest == true) {
+            items[_iID].Arest = false;
         }
         else {
-            presents[presentID].status = presentSTAT.CANCEL;
-        }
-        estates[estateID].presentSTAT = false;
-    }
-
-    function acceptPresent(uint presentID) public {
-        uint estateID = presents[presentID].estateID;
-        require(estates[estateID].arestSTAT == false, "Estate in arest");
-        require(presentID < presents.length, "Wrong estateID!");
-        require(presents[presentID].status == presentSTAT.ACTIVE, "Already finished");
-        require(presents[presentID].adrTo == msg.sender, "This is not for you!");
-        
-        if (presents[presentID].deadline > block.timestamp) {
-            presents[presentID].status = presentSTAT.ACCEPT;
-            estates[estateID].owner = msg.sender;
-        }
-        else {
-            presents[presentID].status = presentSTAT.CANCEL;
-        }
-        estates[estateID].presentSTAT = false;
-    }
-
-
-    function refusePresent(uint presentID) public {
-        uint estateID = presents[presentID].estateID;
-        require(presentID < presents.length, "Wrong estateID!");
-        require(presents[presentID].status == presentSTAT.ACTIVE, "Already finished");
-        require(presents[presentID].adrTo == msg.sender, "This is not for you!");
-        if (presents[presentID].deadline > block.timestamp) {
-            presents[presentID].status = presentSTAT.REFUSE;
-        }
-        else {
-            presents[presentID].status = presentSTAT.CANCEL;
-        }
-        estates[estateID].presentSTAT = false;
-    }
-
-
-    function createSale(uint estateID, uint _price) public statusOK(estateID) onlyOwner(estateID) {
-        require(estateID < estates.length, "Wrong estateID!");
-        require(estates[estateID].owner == msg.sender, "You are not the owner of the house");
-        address[] memory _customers;
-        uint[] memory _bids;
-        sales.push(Sale(estateID, msg.sender, address(0), _price, _customers, _bids));
-        estates[estateID].saleSTAT = true;
-    }
-
-    function makeBid(uint saleID) public payable {
-        uint estateID = sales[saleID].estateID;
-        require(estates[estateID].arestSTAT == false); 
-        require(saleID < sales.length, "Wrong saleID value");
-        require(sales[saleID].owner != msg.sender, "Selfsaling");
-        require(sales[saleID].newOwner == address(0), "Sale is closed");
-        require(sales[saleID].price <= msg.value, "Wrong ether value");
-        bool stat = false;
-        for (uint i = 0; i < sales[saleID].customers.length; i++) {
-            if (sales[saleID].customers[i] == msg.sender && sales[saleID].bids[i] != 0) {
-                stat = true;
-                break;
-            }
-        }
-        require(stat == false, "You have already made a bid");
-
-        sales[saleID].customers.push(msg.sender);
-        sales[saleID].bids.push(msg.value);
-    }
-    
-
-    function refuseBid(uint saleID) public payable {
-        require(saleID < sales.length, "Wrong saleID value");
-        require(sales[saleID].newOwner == address(0), "Sale is closed");
-        for (uint i = 0; i < sales[saleID].customers.length; i++) {
-            if (sales[saleID].customers[i] == msg.sender) {
-                uint bid = sales[saleID].bids[i];
-                require(bid != 0, "Your bid is 0");
-                payable(msg.sender).transfer(sales[saleID].bids[i]);
-                sales[saleID].bids[i] = 0;
-                break;
-            }
+            items[_iID].Arest = true;
         }
     }
 
-
-    function acceptBid(uint saleID, uint bidID) public payable {
-        uint estateID = sales[saleID].estateID;
-        require(estates[estateID].arestSTAT == false, "Estate in arest");
-        require(saleID < sales.length, "Wrong saleID value");
-        require(sales[saleID].newOwner == address(0), "Sale is closed");
-        require(sales[saleID].owner == msg.sender, "Not you sale");
-        for (uint i = 0; i < sales[saleID].customers.length; i++) {
-            if (i != bidID) {
-                payable(sales[saleID].customers[i]).transfer(sales[saleID].bids[i]);
-            }
-            else {
-                payable(sales[saleID].owner).transfer(sales[saleID].bids[bidID]);
-                sales[saleID].newOwner = sales[saleID].customers[bidID];
-                estates[estateID].owner = sales[saleID].customers[bidID];
-            }
-        }
-        estates[estateID].saleSTAT = false;
+    function CreateSale(uint256 _iID, uint256 _price) public isOwner(_iID) isOkayItem(_iID) isExitItem(_iID){
+        require(_price != 0, "401");
+        sales.push(Sale(sales.length, _iID, msg.sender, address(0),  _price * (10**18), true, block.timestamp, 0));
+        items[_iID].SaleStat = true;
     }
 
-
-    function reconsiderSale(uint saleID) public payable {
-        uint estateID = sales[saleID].estateID;
-        require(saleID < sales.length, "Wrong saleID value");
-        require(sales[saleID].newOwner == address(0), "Sale is closed");
-        require(sales[saleID].owner == msg.sender, "Not you sale");
-        for (uint i = 0; i < sales[saleID].customers.length; i++) {
-            payable(sales[saleID].customers[i]).transfer(sales[saleID].bids[i]);
-        }
-        sales[saleID].newOwner = msg.sender;
-        estates[estateID].saleSTAT = false;
+    function CanelSale(uint256 _sID) public {
+        require(sales[_sID].owner == msg.sender, "402");
+        require(sales[_sID].active == true, "403");
+        require(_sID < sales.length, "404");
+        sales[_sID].active = false;
+        items[sales[_sID].iID].SaleStat = false;
     }
 
-
-    function getEstate(uint256 ID_estate) public view returns (
-        address owner,
-        string memory info,
-        uint256 square,
-        bool presentStatus,
-        bool saleSTAT,
-        bool arestSTAT
-    ) {
-        Estate memory estate = estates[ID_estate];
-        return (
-            estate.owner,
-            estate.info,
-            estate.square,
-            estate.presentSTAT,
-            estate.saleSTAT,
-            estate.arestSTAT
-        );
-}
-
-    function getPresent(uint256 ID_present) public view returns (
-        uint256 estateID,
-        address adrFrom,
-        address adrTo,
-        uint256 deadline,
-        uint8 status
-    ) {
-        Present memory present = presents[ID_present];
-        return (
-            present.estateID,
-            present.adrFrom,
-            present.adrTo,
-            present.deadline,
-            uint8(present.status)
-        );
-    }
-
-
-    function getSale(uint256 ID_sale) public view returns (
-        uint256 estateID,
-        address owner,
-        address newOwner,
-        uint256 price,
-        address[] memory customers,
-        uint[] memory bids
-    ) {
-        Sale memory sale = sales[ID_sale];
-        return (
-            sale.estateID,
-            sale.owner,
-            sale.newOwner,
-            sale.price,
-            sale.customers,
-            sale.bids
-        );
-    }
-
-
-
-    function getCustomerList(uint saleID) public view returns(address[] memory) {
-        return sales[saleID].customers;
-    }  
-
-
-    function getBidList(uint saleID) public view returns(uint[] memory) {
-        return sales[saleID].bids;
-    }    
-
-    function getSellsList() public view returns(uint){
-        return sales.length;
-    }
-
-
-    function getListEstate() public view returns(uint){
-        return estates.length;
-
-    }
-
-    function getListPresent() public view returns(uint){
-        return presents.length;
+    function Buy(uint256 _sID) public payable {
+        require(_sID < sales.length, "404");
+        require(sales[_sID].active == true, "403");
+        require(msg.value == sales[_sID].price, "405");
+        require(msg.sender != sales[_sID].owner, "406");
+        sales[_sID].newOwner = msg.sender;
+        sales[_sID].endExhibition = block.timestamp - sales[_sID].exhibitionTime ;
+        sales[_sID].active = false;
+        items[sales[_sID].iID].SaleStat = false;
+        items[sales[_sID].iID].owner = msg.sender;
+        payable(sales[_sID].owner).transfer(msg.value);   
     }
 
 
